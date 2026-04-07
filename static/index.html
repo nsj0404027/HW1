@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Face Recognition - 닮은꼴 연예인 찾기</title>
+    <style>
+        * { box-sizing: border-box; }
+        body { margin: 0; font-family: 'Inter', 'Noto Sans KR', sans-serif; background: #0f172a; color: #f8fafc; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; padding: 2rem;}
+        h1 { margin-bottom: 0.5rem; text-align: center; background: linear-gradient(to right, #38bdf8, #818cf8); -webkit-background-clip: text; color: transparent; font-size: 2.5rem;}
+        p.subtitle { color: #94a3b8; text-align: center; margin-bottom: 2rem; font-size: 1.1rem; }
+        
+        .upload-container { background: #1e293b; border: 2px dashed #475569; padding: 4rem 2rem; border-radius: 1rem; width: 100%; max-width: 600px; text-align: center; transition: all 0.3s ease; cursor: pointer; display: flex; flex-direction: column; align-items: center;}
+        .upload-container:hover { border-color: #38bdf8; background: #1e293bcf; box-shadow: 0 4px 20px rgba(56,189,248,0.2); }
+        .upload-container input { display: none; }
+        .upload-icon { font-size: 4rem; opacity: 0.7; margin-bottom: 1rem; }
+        
+        .btn { background: linear-gradient(to right, #38bdf8, #2563eb); border: none; padding: 0.75rem 2rem; color: #fff; border-radius: 0.5rem; font-size: 1.1rem; cursor: pointer; font-weight: bold; margin-top: 1.5rem; transition: transform 0.2s, box-shadow 0.2s; }
+        .btn:hover { transform: translateY(-2px); box-shadow: 0 4px 15px rgba(37,99,235,0.4); }
+        
+        .loading { display: none; margin-top: 2rem; font-size: 1.2rem; color: #38bdf8; font-weight: bold; animation: pulse 1.5s infinite; }
+        @keyframes pulse { 0% { opacity: 0.5; } 50% { opacity: 1; } 100% { opacity: 0.5; } }
+        
+        .result-container { display: none; width: 100%; max-width: 900px; text-align: center; margin-top: 1rem; background: #1e293b; padding: 3rem; border-radius: 1.5rem; box-shadow: 0 10px 40px rgba(0,0,0,0.5); }
+        .faces { display: flex; justify-content: center; flex-wrap: wrap; margin-top: 2rem; gap: 2rem; }
+        .face-card { background: #0f172a; padding: 1.5rem; border-radius: 1rem; width: 100%; max-width: 350px; text-align: center; box-shadow: 0 6px 15px rgba(0,0,0,0.4); border: 1px solid #334155; }
+        .face-card img { width: 100%; aspect-ratio: 1/1; object-fit: cover; border-radius: 0.5rem; margin-bottom: 1.5rem; }
+        .face-card h3 { color: #cbd5e1; margin: 0; font-size: 1.1rem; }
+        
+        .celebrity-name { font-size: 2rem; color: #a5b4fc; font-weight: bold; margin-bottom: 0.5rem; }
+    </style>
+</head>
+<body>
+    <h1>유사한 얼굴상 연예인 찾기</h1>
+    <p class="subtitle">좋아하는 유명인의 사진을 업로드하면 비슷한 분위기의 다른 연예인을 추천해 드립니다.</p>
+
+    <div class="upload-container" id="dropArea" onclick="document.getElementById('fileInput').click()">
+        <div class="upload-icon">📸</div>
+        <p style="font-size: 1.2rem; color: #f8fafc; font-weight: bold; margin-bottom: 0.5rem;">유명인 혹은 연예인의 사진을 업로드하세요</p>
+        <p style="color: #64748b; font-size: 0.9rem;">(또는 사진을 이곳으로 드래그 앤 드롭 하세요)</p>
+        <input type="file" id="fileInput" accept="image/*" onchange="handleFile(this.files[0])">
+    </div>
+
+    <div class="loading" id="loading">✨ AI가 얼굴 속 숨겨진 매력을 분석하고 있습니다... ✨</div>
+
+    <div class="result-container" id="resultArea">
+        <h2 style="color: #f8fafc; margin-top: 0;">🎉 AI 분석 결과 🎉</h2>
+        <div class="celebrity-name" id="celebName"></div>
+        <p style="color: #94a3b8; font-size: 1rem;">유사한 분위기를 가진 스타를 찾았습니다!</p>
+        
+        <div class="faces">
+            <div class="face-card">
+                <img id="userImage" src="" alt="업로드한 사진">
+                <h3>업로드한 사진</h3>
+            </div>
+            <div class="face-card">
+                <img id="celebImage" src="" alt="연예인 사진">
+                <h3>비슷한 느낌의 다른 연예인</h3>
+            </div>
+        </div>
+        <button class="btn" onclick="location.reload()">다른 사진으로 다시하기</button>
+    </div>
+
+    <script>
+        const dropArea = document.getElementById('dropArea');
+        dropArea.addEventListener('dragover', (e) => { 
+            e.preventDefault(); 
+            dropArea.style.borderColor = '#38bdf8'; 
+            dropArea.style.background = '#1e293bcf';
+        });
+        dropArea.addEventListener('dragleave', () => {
+            dropArea.style.borderColor = '#475569'; 
+            dropArea.style.background = '#1e293b';
+        });
+        dropArea.addEventListener('drop', (e) => { 
+            e.preventDefault(); 
+            dropArea.style.borderColor = '#475569'; 
+            dropArea.style.background = '#1e293b';
+            handleFile(e.dataTransfer.files[0]); 
+        });
+
+        async function handleFile(file) {
+            if (!file) return;
+            document.getElementById('dropArea').style.display = 'none';
+            document.getElementById('loading').style.display = 'block';
+            
+            const formData = new FormData();
+            formData.append('file', file);
+
+            try {
+                const res = await fetch('/upload', { method: 'POST', body: formData });
+                const data = await res.json();
+                
+                document.getElementById('loading').style.display = 'none';
+                document.getElementById('resultArea').style.display = 'block';
+                
+                document.getElementById('celebName').innerText = `가장 비슷한 분위기의 연예인은 '${data.celebrity_name}' 입니다!`;
+                // 쿼리 스트링을 추가하여 브라우저의 캐싱을 무력화시켜 가장 최근 사진이 보이도록 처리
+                document.getElementById('userImage').src = data.user_image + '?t=' + new Date().getTime();
+                document.getElementById('celebImage').src = data.celebrity_image_url;
+            } catch(e) {
+                alert('이미지 업로드 및 분석 중 오류가 발생했습니다. 서버가 켜져있는지 확인해주세요.');
+                location.reload();
+            }
+        }
+    </script>
+</body>
+</html>
