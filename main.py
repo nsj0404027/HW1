@@ -1,4 +1,4 @@
-from fastapi import FastAPI, UploadFile, File
+from fastapi import FastAPI, UploadFile, File, Form
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 from model.face_recommender import FaceRecommender
@@ -17,9 +17,9 @@ app.mount("/static", StaticFiles(directory="static"), name="static")
 
 def search_naver_image(query: str):
     """
-    Scrapes Naver Image Search to find the first image result for a query.
+    Scrapes Naver Integrated Search to find the celebrity's profile image result.
     """
-    url = f"https://search.naver.com/search.naver?where=image&sm=tab_jum&query={urllib.parse.quote(query)}"
+    url = f"https://search.naver.com/search.naver?where=nexearch&sm=top_hty&fbm=0&ie=utf8&query={urllib.parse.quote(query)}"
     headers = {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
     }
@@ -27,10 +27,11 @@ def search_naver_image(query: str):
         response = requests.get(url, headers=headers, timeout=5)
         soup = BeautifulSoup(response.text, 'html.parser')
         
-        # Iterates over <img> tags to find a valid remote image url
         for img in soup.find_all('img'):
-            src = img.get('data-lazy-src') or img.get('src')
-            if src and src.startswith('http') and 'data:image' not in src and 'spm' not in src:
+            src = img.get('src') or img.get('data-src') or img.get('data-lazy-src')
+            if src and 'search.pstatic.net/common' in src and 'people' in urllib.parse.unquote(src):
+                return src
+            elif src and 'search.pstatic.net/common' in src: # fallback if people string not found
                 return src
     except Exception as e:
         print(f"Error fetching image: {e}")
@@ -44,20 +45,23 @@ def home():
     return {"message": "Service is Running!"}
 
 @app.post("/upload")
-async def upload_image(file: UploadFile = File(...)):
+async def upload_image(file: UploadFile = File(...), category: str = Form("all")):
     # Save the file temporarily
     file_path = f"static/uploads/{file.filename}"
     with open(file_path, "wb") as buffer:
         shutil.copyfileobj(file.file, buffer)
     
     # Predict the celebrity
-    celebrity_name = recommender.recommend(file_path)
+    result = recommender.recommend(file_path, category)
+    celebrity_name = result["name"]
     
     # Fetch the celebrity image from Naver
-    celeb_img_url = search_naver_image(f"{celebrity_name} 연예인 얼굴 정면")
+    celeb_img_url = search_naver_image(celebrity_name)
     
     return {
         "user_image": f"/static/uploads/{file.filename}",
         "celebrity_name": celebrity_name,
-        "celebrity_image_url": celeb_img_url
+        "celebrity_image_url": celeb_img_url,
+        "instagram": result["instagram"],
+        "namuwiki": result["namuwiki"]
     }

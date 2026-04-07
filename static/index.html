@@ -10,9 +10,14 @@
         h1 { margin-bottom: 0.5rem; text-align: center; background: linear-gradient(to right, #38bdf8, #818cf8); -webkit-background-clip: text; color: transparent; font-size: 2.5rem;}
         p.subtitle { color: #94a3b8; text-align: center; margin-bottom: 2rem; font-size: 1.1rem; }
         
+        .category-selector { display: flex; justify-content: center; gap: 1rem; margin-bottom: 2rem; }
+        .category-label { background: #1e293b; padding: 0.75rem 1.5rem; border-radius: 2rem; border: 2px solid #334155; color: #cbd5e1; cursor: pointer; transition: all 0.2s; font-weight: bold; }
+        .category-input { display: none; }
+        .category-input:checked + .category-label { background: #38bdf8; border-color: #38bdf8; color: #0f172a; }
+
         .upload-container { background: #1e293b; border: 2px dashed #475569; padding: 4rem 2rem; border-radius: 1rem; width: 100%; max-width: 600px; text-align: center; transition: all 0.3s ease; cursor: pointer; display: flex; flex-direction: column; align-items: center;}
         .upload-container:hover { border-color: #38bdf8; background: #1e293bcf; box-shadow: 0 4px 20px rgba(56,189,248,0.2); }
-        .upload-container input { display: none; }
+        .upload-container input[type="file"] { display: none; }
         .upload-icon { font-size: 4rem; opacity: 0.7; margin-bottom: 1rem; }
         
         .btn { background: linear-gradient(to right, #38bdf8, #2563eb); border: none; padding: 0.75rem 2rem; color: #fff; border-radius: 0.5rem; font-size: 1.1rem; cursor: pointer; font-weight: bold; margin-top: 1.5rem; transition: transform 0.2s, box-shadow 0.2s; }
@@ -23,16 +28,34 @@
         
         .result-container { display: none; width: 100%; max-width: 900px; text-align: center; margin-top: 1rem; background: #1e293b; padding: 3rem; border-radius: 1.5rem; box-shadow: 0 10px 40px rgba(0,0,0,0.5); }
         .faces { display: flex; justify-content: center; flex-wrap: wrap; margin-top: 2rem; gap: 2rem; }
-        .face-card { background: #0f172a; padding: 1.5rem; border-radius: 1rem; width: 100%; max-width: 350px; text-align: center; box-shadow: 0 6px 15px rgba(0,0,0,0.4); border: 1px solid #334155; }
+        .face-card { background: #0f172a; padding: 1.5rem; border-radius: 1rem; width: 100%; max-width: 350px; text-align: center; box-shadow: 0 6px 15px rgba(0,0,0,0.4); border: 1px solid #334155; display: flex; flex-direction: column;}
         .face-card img { width: 100%; aspect-ratio: 1/1; object-fit: cover; border-radius: 0.5rem; margin-bottom: 1.5rem; }
         .face-card h3 { color: #cbd5e1; margin: 0; font-size: 1.1rem; }
         
         .celebrity-name { font-size: 2rem; color: #a5b4fc; font-weight: bold; margin-bottom: 0.5rem; }
+        
+        .social-links { display: flex; justify-content: center; gap: 0.5rem; margin-top: 1rem; }
+        .social-btn { display: inline-block; padding: 0.5rem 1.2rem; border-radius: 0.5rem; color: white; text-decoration: none; font-size: 0.95rem; font-weight: bold; transition: opacity 0.2s; }
+        .social-btn:hover { opacity: 0.8; }
+        .btn-insta { background: linear-gradient(45deg, #f09433 0%, #e6683c 25%, #dc2743 50%, #cc2366 75%, #bc1888 100%); }
+        .btn-namu { background: #00A495; }
     </style>
 </head>
 <body>
     <h1>유사한 얼굴상 연예인 찾기</h1>
     <p class="subtitle">좋아하는 유명인의 사진을 업로드하면 비슷한 분위기의 다른 연예인을 추천해 드립니다.</p>
+
+    <!-- Category Selector -->
+    <div class="category-selector">
+        <input type="radio" name="category" id="cat-all" value="all" class="category-input" checked>
+        <label for="cat-all" class="category-label">상관없이 보기</label>
+        
+        <input type="radio" name="category" id="cat-actor" value="actor" class="category-input">
+        <label for="cat-actor" class="category-label">배우결과만 보기</label>
+        
+        <input type="radio" name="category" id="cat-singer" value="singer" class="category-input">
+        <label for="cat-singer" class="category-label">가수결과만 보기</label>
+    </div>
 
     <div class="upload-container" id="dropArea" onclick="document.getElementById('fileInput').click()">
         <div class="upload-icon">📸</div>
@@ -56,6 +79,11 @@
             <div class="face-card">
                 <img id="celebImage" src="" alt="연예인 사진">
                 <h3>비슷한 느낌의 다른 연예인</h3>
+                <!-- Social Links -->
+                <div class="social-links" id="socialLinks">
+                    <a id="instaLink" href="#" target="_blank" class="social-btn btn-insta">Instagram</a>
+                    <a id="namuLink" href="#" target="_blank" class="social-btn btn-namu">나무위키</a>
+                </div>
             </div>
         </div>
         <button class="btn" onclick="location.reload()">다른 사진으로 다시하기</button>
@@ -81,11 +109,17 @@
 
         async function handleFile(file) {
             if (!file) return;
+            
+            // Get selected category
+            const category = document.querySelector('input[name="category"]:checked').value;
+            
+            document.querySelector('.category-selector').style.display = 'none';
             document.getElementById('dropArea').style.display = 'none';
             document.getElementById('loading').style.display = 'block';
             
             const formData = new FormData();
             formData.append('file', file);
+            formData.append('category', category);
 
             try {
                 const res = await fetch('/upload', { method: 'POST', body: formData });
@@ -98,6 +132,11 @@
                 // 쿼리 스트링을 추가하여 브라우저의 캐싱을 무력화시켜 가장 최근 사진이 보이도록 처리
                 document.getElementById('userImage').src = data.user_image + '?t=' + new Date().getTime();
                 document.getElementById('celebImage').src = data.celebrity_image_url;
+                
+                // Update social links
+                document.getElementById('instaLink').href = data.instagram;
+                document.getElementById('namuLink').href = data.namuwiki;
+                
             } catch(e) {
                 alert('이미지 업로드 및 분석 중 오류가 발생했습니다. 서버가 켜져있는지 확인해주세요.');
                 location.reload();
